@@ -1,16 +1,13 @@
 package user
 
 import (
-	"fmt"
-
-	sendnewsletter "github.com/padiazg/qor-worker-test/app/workers/send-newsletter"
-	wrk "github.com/padiazg/qor-worker-test/app/workers/send-newsletter"
+	wrk_se "github.com/padiazg/qor-worker-test/app/workers/send-email"
+	wrk_sn "github.com/padiazg/qor-worker-test/app/workers/send-newsletter"
 	"github.com/padiazg/qor-worker-test/config/application"
 	templatedata "github.com/padiazg/qor-worker-test/model/template-data"
 	um "github.com/padiazg/qor-worker-test/model/user"
 	"github.com/qor/admin"
 	"github.com/qor/worker"
-	// "github.com/qor/worker"
 )
 
 // Config home config struct
@@ -58,14 +55,14 @@ func (app App) ConfigureApplication(application *application.Application) {
 		Name: "Send Newsletter A",
 		Handler: func(argument *admin.ActionArgument) error {
 			var (
-				w      = application.Workers["SendNewsletter"].(*wrk.Worker).Worker
+				w      = application.Workers["SendNewsletter"].(*wrk_sn.Worker).Worker
 				job    = w.GetRegisteredJob("SendNewsletter")
 				res    = w.JobResource
 				ctx    = argument.Context.Context
 				newJob = res.NewStruct().(worker.QorJobInterface)
 			)
 
-			newJob.SetSerializableArgumentValue(&sendnewsletter.SendNewsletterArgument{
+			newJob.SetSerializableArgumentValue(&wrk_sn.SendNewsletterArgument{
 				Subject:      "Hello",
 				Content:      "World",
 				SendPassword: "123456",
@@ -83,9 +80,9 @@ func (app App) ConfigureApplication(application *application.Application) {
 	user.Action(&admin.Action{
 		Name: "Send Newsletter B",
 		Handler: func(argument *admin.ActionArgument) error {
-			var w = application.Workers["SendNewsletter"].(*wrk.Worker)
+			var w = application.Workers["SendNewsletter"].(*wrk_sn.Worker)
 
-			w.SendNewsletter(&wrk.SendNewsletterArgument{
+			w.SendNewsletter(&wrk_sn.SendNewsletterArgument{
 				Subject:      "Hello",
 				Content:      "World",
 				SendPassword: "123456",
@@ -105,12 +102,54 @@ func (app App) ConfigureApplication(application *application.Application) {
 					emailSettings = application.Config.Settings.Email
 				)
 
-				if err := emailSettings.SendEmail(user.Email, "Hello", templatedata.TemplateData{
-					"Name": fmt.Sprintf("%s, %s", user.Last, user.First),
+				if err := emailSettings.SendEmail(user.Email, "Hello", &templatedata.TemplateData{
+					"Name": user.First,
 				}); err != nil {
 					argument.Context.AddError(err)
 					return err
 				}
+			}
+
+			return nil
+		},
+		Modes: []string{"menu_item", "edit"},
+	})
+
+	user.Action(&admin.Action{
+		Name: "Send email (async)",
+		Handler: func(argument *admin.ActionArgument) error {
+			var (
+				w      = application.Workers["SendEmail"].(*wrk_se.Worker).Worker
+				job    = w.GetRegisteredJob("SendEmail")
+				res    = w.JobResource
+				ctx    = argument.Context.Context
+				newJob = res.NewStruct().(worker.QorJobInterface)
+			)
+
+			for _, record := range argument.FindSelectedRecords() {
+				var (
+					user = record.(*um.User)
+				)
+				newJob.SetSerializableArgumentValue(&wrk_se.SendEmailArgument{
+					To:      user.Email,
+					Subject: "Hello from Action",
+					Data: &templatedata.TemplateData{
+						"First": user.First,
+						"Last":  user.Last,
+					},
+				})
+
+				newJob.SetJob(job)
+				res.CallSave(newJob, ctx)
+				w.AddJob(newJob)
+
+				// if err := emailSettings.SendEmail(user.Email, "Hello", &templatedata.TemplateData{
+				// 	"Name": user.First,
+				// }); err != nil {
+				// 	argument.Context.AddError(err)
+				// 	return err
+				// }
+
 			}
 
 			return nil

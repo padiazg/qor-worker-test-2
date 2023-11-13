@@ -71,12 +71,19 @@ func (wrk *Worker) SendNewsletter(argument *SendNewsletterArgument, ctx *admin.C
 
 	// apply argument to job
 	newJob.SetSerializableArgumentValue(argument)
+
 	// set job to be run
 	newJob.SetJob(job)
+
 	// save the job
-	res.CallSave(newJob, ctx.Context)
+	if err := res.CallSave(newJob, ctx.Context); err != nil {
+		return fmt.Errorf("error saving job: %v", err)
+	}
+
 	// add job to worker
-	w.AddJob(newJob)
+	if err := w.AddJob(newJob); err != nil {
+		return fmt.Errorf("error adding job to worker: %v", err)
+	}
 
 	return nil
 }

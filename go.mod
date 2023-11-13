@@ -1,6 +1,6 @@
 module github.com/padiazg/qor-worker-test
 
-go 1.21.0
+go 1.21
 
 require (
 	github.com/go-chi/chi/v5 v5.0.10

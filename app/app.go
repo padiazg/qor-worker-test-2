@@ -8,6 +8,7 @@ import (
 	"github.com/padiazg/qor-worker-test/app/admin"
 	"github.com/padiazg/qor-worker-test/app/static"
 	"github.com/padiazg/qor-worker-test/app/user"
+	se "github.com/padiazg/qor-worker-test/app/workers/send-email"
 	snl "github.com/padiazg/qor-worker-test/app/workers/send-newsletter"
 	"github.com/padiazg/qor-worker-test/config/application"
 	qa "github.com/qor/admin"
@@ -38,6 +39,13 @@ func Mount(Application *application.Application, ctx context.Context) {
 		AdminConfig: &qa.Config{
 			Menu: []string{"Workers"},
 			Name: "Send Newsletter",
+		},
+	}))
+
+	Application.Use(se.New(&se.Config{
+		AdminConfig: &qa.Config{
+			Menu: []string{"Workers"},
+			Name: "Send Email",
 		},
 	}))
 

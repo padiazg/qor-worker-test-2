@@ -1,9 +1,15 @@
 package admin
 
 import (
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"reflect"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/padiazg/qor-worker-test/config/application"
 	"github.com/qor/admin"
+	"github.com/qor/assetfs"
 )
 
 type Config struct {
@@ -23,10 +29,8 @@ func New(config *Config) *App {
 }
 
 func (app App) ConfigureApplication(application *application.Application) {
-	// assign new Admin insantance
-	application.Admin = admin.New(&admin.AdminConfig{
-		DB: application.DB,
-	})
+	app.ConfigureAdmin(application)
+	app.ConfigureFuncMaps(application)
 
 	application.Router.Route(app.Config.Prefix, func(r chi.Router) {
 		// r.Use(func(next http.Handler) http.Handler { return mw.AdminAuthedMiddleware(next, application) })
@@ -37,18 +41,38 @@ func (app App) ConfigureApplication(application *application.Application) {
 
 // ConfigureAdmin configure admin interface
 func (app App) ConfigureAdmin(application *application.Application) {
-	// Add Dashboard
-	// application.Admin.AddResource(&asset_manager.AssetManager{}, &admin.Config{Invisible: true})
+	fs := assetfs.AssetFS()
+	fs.RegisterPath("app/views")
+
+	application.Admin = admin.New(&admin.AdminConfig{
+		DB:      application.DB,
+		AssetFS: fs,
+	})
+
 }
 
 func (app App) ConfigureFuncMaps(application *application.Application) {
-	// // Frontend FuncMaps
-	// fm.GlobalFuncs.Add(map[string]interface{}{
-	// 	"AuthURL": application.Auth.AuthURL,
-	// 	"Flashes": application.Auth.Flashes,
-	// 	"IsFullstoryEnabled": func() bool {
-	// 		// TODO: get this flag from the license
-	// 		return application.AllSettings.Settings.FullstoryEnabled
-	// 	},
-	// })
+	application.Admin.RegisterFuncMap("marshal", func(v interface{}) template.JS {
+		var res string
+
+		if a, err := json.Marshal(v); err != nil {
+			res = fmt.Sprintf("error marshalling: %+v", err)
+		} else {
+			res = string(a)
+		}
+
+		return template.JS(res)
+	})
+
+	application.Admin.RegisterFuncMap("avail", func(name string, data interface{}) bool {
+		v := reflect.ValueOf(data)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Struct {
+			return false
+		}
+		return v.FieldByName(name).IsValid()
+	})
+
 }
